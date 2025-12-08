@@ -495,17 +495,19 @@
         // **** 🚨 請將此網址替換成您在 Vercel 或 Render 部署後取得的 HTTPS 網址！ ****
         const PROXY_SERVER_URL = "wss://urbannnn.onrender.com";
         // *******************************************************************
-
+        const API_HOST = "generativelanguage.googleapis.com";
         const AUDIO_SAMPLE_RATE = 24000; // Native Audio PCM 要求 24kHz
         // ... (其他參數設定)
 
         // --- 修改 connectWebSocket 函數 ---
         function connectWebSocket() {
             if (ws && ws.readyState === WebSocket.OPEN) return;
-
-            // 不再使用 API_HOST，直接使用您的代理伺服器網址
-            const url = PROXY_SERVER_URL;
-
+        
+            // 將 API Key 附加在後面 (這是後端程式碼 server.js 設計的要求)
+            // 這是最關鍵的一行，確保前端連線到 Render Proxy
+            const apiKey = document.getElementById("startApiKey").value;
+            const url = `${PROXY_SERVER_URL}?key=${apiKey}`; // 您的 Proxy Server 需要 Key 才能轉發
+        
             ws = new WebSocket(url);
             
         const AUDIO_SAMPLE_RATE = 24000; // Native Audio PCM 要求 24kHz
