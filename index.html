@@ -439,10 +439,16 @@
     </div>
 
     <script>
+<script>
         // ==========================================
         //  配置區 (Native Audio Parameters)
         // ==========================================
         const API_HOST = "generativelanguage.googleapis.com";
+        // **** 🚨 請將此網址替換成您在 Render 部署後取得的 HTTPS 網址！ ****
+        // 您的 Render 網址：https://urbannnn.onrender.com
+        const PROXY_SERVER_URL = "wss://urbannnn.onrender.com"; 
+        // *******************************************************************
+
         const AUDIO_SAMPLE_RATE = 24000; // Native Audio PCM 要求 24kHz
         const AUDIO_CHANNELS = 1;      // 單聲道
         const AUDIO_CHUNK_SIZE = 4096; // 緩衝區大小
@@ -486,7 +492,8 @@
             if (ws && ws.readyState === WebSocket.OPEN) return;
 
             const apiKey = document.getElementById("startApiKey").value;
-            const url = `wss://${API_HOST}/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${apiKey}`;
+            // 🚨 關鍵連線：連線到您的 Render Proxy 伺服器
+            const url = `${PROXY_SERVER_URL}?key=${apiKey}`;
 
             ws = new WebSocket(url);
             
@@ -517,7 +524,10 @@
                 }
             };
 
-            ws.onclose = () => { updateStatus("連線中斷", false); };
+            ws.onclose = () => { updateStatus("連線中斷", false); 
+                // 由於 Render Free Tier 會休眠，這裡不再嘗試自動重連，提示用戶手動重試
+                document.getElementById("subtitleOverlay").innerText = "連線中斷。Render 服務可能已休眠，請重啟網頁或稍候重試。";
+            };
             ws.onerror = (e) => { console.error("WS Error:", e); updateStatus("連線錯誤", false); };
         }
 
@@ -874,7 +884,7 @@
                     <div class="coach-part coach-suggestion"><b>💡 教練建議：</b>$2</div>
                 </div>`);
             if (!t.includes('coach-feedback') && t.includes('[教練建議]:')) {
-                 t = t.replace(/\[教練建議\]:(.*)/s, `<div class="coach-feedback"><div class="coach-part coach-suggestion"><b>💡 教練建議：</b>$1</div></div>`);
+                    t = t.replace(/\[教練建議\]:(.*)/s, `<div class="coach-feedback"><div class="coach-part coach-suggestion"><b>💡 教練建議：</b>$1</div></div>`);
             }
             return t;
         }
