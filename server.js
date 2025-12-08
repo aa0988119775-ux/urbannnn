@@ -1,39 +1,53 @@
 const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
+// 引入 URL 解析工具
+const url = require('url'); 
 
 const app = express();
-// 1. 伺服器運行的端口號
 const PORT = process.env.PORT || 8080;
-// 2. 從環境變數中安全地讀取 API Key (部署時設定，例如在 Vercel)
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
-if (!GEMINI_API_KEY) {
-    console.error("錯誤: GEMINI_API_KEY 環境變數未設定。請設定後再啟動伺服器。");
-    process.exit(1);
-}
+// *** 部署時，請確保您的 Render 服務名稱是 'urbannnn' ***
 
 // --- 啟用 CORS 與 HTTP 健康檢查 ---
 app.use((req, res, next) => {
-    // 允許任何來源連線
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Origin', '*'); 
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
     next();
 });
 
 app.get('/', (req, res) => {
-    res.send('Gemini Live Proxy is running.');
+    res.send('Gemini Live Proxy is running. Waiting for WSS connection...');
 });
 
 const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
+
+// 🚨 關鍵改變：啟用 verifyClient 檢查連線參數
+const wss = new WebSocket.Server({ 
+    server,
+    verifyClient: (info, done) => {
+        // 檢查客戶端連線 URL 是否有 API Key
+        const parsedUrl = url.parse(info.req.url, true);
+        const clientKey = parsedUrl.query.key;
+        if (!clientKey || clientKey.length < 10) {
+            console.error("Client attempted connection without a valid API key.");
+            // 拒絕連線
+            return done(false, 401, 'Unauthorized: API Key missing or invalid.');
+        }
+        // 將 Key 附加到請求中，供 wss.on('connection') 使用
+        info.req.geminiKey = clientKey; 
+        done(true); // 接受連線
+    }
+});
+
 
 // --- 處理客戶端 WebSocket 連線 (核心代理邏輯) ---
-wss.on('connection', (clientWs) => {
-    console.log('Client connected from browser.');
+wss.on('connection', (clientWs, req) => {
+    const GEMINI_API_KEY = req.geminiKey; // 🚨 從客戶端連線 URL 中讀取 Key
+    console.log(`Client connected. Using key: ${GEMINI_API_KEY.substring(0, 4)}...`);
 
-    // 建立與 Google Live API 的連線
+    // 建立與 Google Live API 的連線，並將客戶端傳來的 Key 附上
     const geminiWsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${GEMINI_API_KEY}`;
     let geminiWs = new WebSocket(geminiWsUrl);
     
@@ -55,6 +69,9 @@ wss.on('connection', (clientWs) => {
     clientWs.on('message', (data) => {
         if (isGeminiConnected && geminiWs.readyState === WebSocket.OPEN) {
             geminiWs.send(data);
+        } else if (!isGeminiConnected) {
+            // 如果 Gemini 連線尚未建立，客戶端應等待
+            console.warn('Waiting for Gemini connection...');
         }
     });
 
